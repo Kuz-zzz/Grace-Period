@@ -7,6 +7,6 @@ Commands:
 - /grace stop - immediately stops the grace period and forces PvP on.
 - /grace help - see available commands
 
-Description:
+
 Enables grace period for PvP gamemodes and shows grace time left as status text on the right side of the screen.
 Colors of the text and the timer can be configured in tshock/Grace.json
