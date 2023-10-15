@@ -4,7 +4,8 @@ using TerrariaApi.Server;
 using TShockAPI;
 using System.Text;
 using Newtonsoft.Json;
-
+using System.Globalization;
+using System.IO;
 
 namespace GracePeriod
 {
@@ -21,7 +22,7 @@ namespace GracePeriod
 
         public override string Name => "Grace Period";
 
-        public override Version Version => new Version(1, 0, 0, 0);
+        public override Version Version => new Version(1, 1, 0, 0);
 
         public GracePeriod(Main game) : base(game)
         {
@@ -34,7 +35,7 @@ namespace GracePeriod
         private static DateTime timer_end;
 
         private static Config config;
-        internal static string filepath { get { return Path.Combine(TShock.SavePath, "Grace.json"); } }
+        internal static string filepath { get { return Path.Combine(TShock.SavePath, "grace.json"); } }
 
 
         private static void ReadConfig<TConfig>(string path, TConfig defaultConfig, out TConfig config)
@@ -47,17 +48,24 @@ namespace GracePeriod
             else
             {
                 config = JsonConvert.DeserializeObject<TConfig>(File.ReadAllText(path));
+                
             }
         }
         public override void Initialize()
         {
+            ReadConfig(filepath, Config.DefaultConfig(), out config);
+            if (config.announcement_color == "_")
+            {
+                config = Config.DefaultConfig();
+                File.WriteAllText(filepath, JsonConvert.SerializeObject(config, Formatting.Indented));
+            }
             ReadConfig(filepath, Config.DefaultConfig(), out config);
 
             ServerApi.Hooks.GameUpdate.Register(this, OnGameUpdate);
 
             GetDataHandlers.TogglePvp += OnTogglePvp;
 
-            Commands.ChatCommands.Add(new Command("tshock.grace", grace, "grace"));
+            Commands.ChatCommands.Add(new Command("tshock.grace", Grace, "grace"));
         }
 
         protected override void Dispose(bool disposing)
@@ -74,23 +82,23 @@ namespace GracePeriod
 
         private void OnGameUpdate(EventArgs args)
         {
-            foreach (TSPlayer tSPlayer in TShock.Players)
+            foreach (TSPlayer player in TShock.Players)
             {
-                if (tSPlayer == null) continue;
-                if (tSPlayer.TPlayer.hostile != PvPForcedOn)
+                if (player == null) continue;
+                if (player.TPlayer.hostile != PvPForcedOn)
                 {
-                    SetPvP(tSPlayer, PvPForcedOn);
-                    tSPlayer.SendInfoMessage("Your PvP was {0}abled!", PvPForcedOn ? "en" : "dis");
+                    SetPvP(player, PvPForcedOn);
+                    player.SendInfoMessage("Your PvP was {0}abled!", PvPForcedOn ? "en" : "dis");
                 }
             }
         }
 
-        private void grace(CommandArgs args)
+        private void Grace(CommandArgs args)
         {
-            TSPlayer tSPlayer = args.Player;
+            TSPlayer player = args.Player;
             if (args.Parameters.Count == 0)
             {
-                tSPlayer.SendErrorMessage("Invalid syntax! Check {0}grace help to see available commands", Commands.Specifier);
+                player.SendErrorMessage("Invalid syntax! Check {0}grace help to see available commands", Commands.Specifier);
                 return;
             }
             switch (args.Parameters[0])
@@ -100,34 +108,34 @@ namespace GracePeriod
                     {
                         if (int.TryParse("123", out _))
                         {
-                            graceStart(int.Parse(args.Parameters[1]));
+                            GraceStart(int.Parse(args.Parameters[1]));
                         }
                         else
                         {
-                            tSPlayer.SendErrorMessage("Invalid syntax! Proper syntax: {0}grace start <time in seconds>", Commands.Specifier);
+                            player.SendErrorMessage("Invalid syntax! Proper syntax: {0}grace start <time in seconds>", Commands.Specifier);
                         }
 
                     }
                     else
                     {
-                        tSPlayer.SendErrorMessage("Invalid syntax! Proper syntax: {0}grace start <time in seconds>", Commands.Specifier);
+                        player.SendErrorMessage("Invalid syntax! Proper syntax: {0}grace start <time in seconds>", Commands.Specifier);
                     }
                     break;
                 case "stop":
-                    graceStop();
+                    GraceStop();
                     break;
                 case "help":
-                    graceHelp(args.Player);
+                    GraceHelp(args.Player);
                     break;
 
             }
         }
 
-        private void graceStart(int sec)
+        private void GraceStart(int sec)
         {
             Timer.Interval = sec * 1000;
             Timer.Enabled = true;
-            Timer.Elapsed += new ElapsedEventHandler(graceStop);
+            Timer.Elapsed += new ElapsedEventHandler(GraceStop);
             OneSecTimer.Interval = 1000;
             OneSecTimer.Enabled = true;
             OneSecTimer.Elapsed += new ElapsedEventHandler(OnOneSec);
@@ -137,44 +145,50 @@ namespace GracePeriod
 
         }
 
-        private void graceStop()
+        private void GraceStop()
         {
             Timer.Enabled = false;
             OneSecTimer.Enabled = false;
             PvPForcedOn = true;
             ForcePvP();
-            TShock.Utils.Broadcast("Grace period is over! PvP is on!", Microsoft.Xna.Framework.Color.DarkRed);
-            foreach (TSPlayer tSPlayer in TShock.Players)
+            TShock.Utils.Broadcast(config.announcement_text, Microsoft.Xna.Framework.Color.Red);
+            foreach (TSPlayer player in TShock.Players)
             {
-                if (tSPlayer != null)
+                if (player != null)
                 {
-                    tSPlayer.SendData(PacketTypes.Status, RepeatLineBreaks(60));
+                    player.SendData(PacketTypes.Status, number2:1);
                 }
             }
         }
 
-        private void graceHelp(TSPlayer player)
+        private void GraceHelp(TSPlayer player)
         {
             player.SendInfoMessage("/grace help - see this message");
             player.SendInfoMessage("/grace start <timeInSeconds> - start the grace period, set it to -1 to make it infinite");
             player.SendInfoMessage("/grace stop - immediately stop the grace period and force PvP on");
         }
 
-        internal static void graceStop(object sender, ElapsedEventArgs args)
+        internal static void GraceStop(object sender, ElapsedEventArgs args)
         {
             Timer.Enabled = false;
             OneSecTimer.Enabled = false;
             PvPForcedOn = true;
             ForcePvP();
-            TShock.Utils.Broadcast("Grace period is over! PvP is on!", Microsoft.Xna.Framework.Color.DarkRed);
-            foreach (TSPlayer tSPlayer in TShock.Players)
+            foreach (TSPlayer player in TShock.Players)
             {
-                if (tSPlayer != null)
+                if (player != null)
                 {
-                    tSPlayer.SendData(PacketTypes.Status, RepeatLineBreaks(60));
+                    player.SendData(PacketTypes.Status, number2: 1);
                 }
 
             }
+
+            int r = int.Parse(config.announcement_color.Substring(0, 2), NumberStyles.AllowHexSpecifier); 
+            int g = int.Parse(config.announcement_color.Substring(2, 2), NumberStyles.AllowHexSpecifier);
+            int b = int.Parse(config.announcement_color.Substring(4, 2), NumberStyles.AllowHexSpecifier);
+
+            TShock.Utils.Broadcast(config.announcement_text, (byte)r, (byte)g, (byte)b);
+            
         }
         internal static void OnOneSec(object sender, ElapsedEventArgs args)
         {
@@ -183,10 +197,22 @@ namespace GracePeriod
             TimeLeft %= 3600;
             int minutes = (TimeLeft / 60);
             int seconds = (TimeLeft % 60);
-            string time_left = hours.ToString() + "h " + minutes.ToString() + "m " + seconds.ToString() + "s ";
-            foreach (TSPlayer tSPlayer in TShock.Players)
+            string time_left = "";
+            if (hours != 0)
             {
-                tSPlayer.SendData(PacketTypes.Status, RepeatLineBreaks(12) + "[c/" + config.text_color + ":Grace period ends: ]\n" + "[c/" + config.timer_color + ":" + time_left + "]" + RepeatLineBreaks(50));
+                time_left = hours.ToString() + "h " + minutes.ToString() + "m " + seconds.ToString() + "s ";
+
+            } else if (minutes != 0)
+            {
+                time_left = minutes.ToString() + "m " + seconds.ToString() + "s ";
+
+            } else
+            {
+                time_left = seconds.ToString() + "s ";
+            }
+            foreach (TSPlayer player in TShock.Players)
+            {
+                player.SendData(PacketTypes.Status, RepeatLineBreaks(12) + "[c/" + config.text_color + ":Grace period ends: ]\n" + "[c/" + config.timer_color + ":" + time_left + "]", number2:1);
             }
 
         }
@@ -195,26 +221,26 @@ namespace GracePeriod
             if (args.Pvp == PvPForcedOn) return;
 
             // This is necessary so the pvp toggle message doesn't appear in chat.
-            TSPlayer tSPlayer = args.Player;
-            SetPvP(tSPlayer, PvPForcedOn);
-            tSPlayer.SendErrorMessage("You're not allowed to toggle PvP!");
+            TSPlayer player = args.Player;
+            SetPvP(player, PvPForcedOn);
+            player.SendErrorMessage("You're not allowed to toggle PvP!");
             args.Handled = true;
         }
 
 
         public static void ForcePvP()
         {
-            foreach (TSPlayer tSPlayer in TShock.Players)
+            foreach (TSPlayer player in TShock.Players)
             {
-                if (tSPlayer == null && PvPForcedOn) continue;
-                SetPvP(tSPlayer, PvPForcedOn);
+                if (player == null && PvPForcedOn) continue;
+                SetPvP(player, PvPForcedOn);
             }
         }
 
-        private static void SetPvP(TSPlayer tSPlayer, bool mode)
+        private static void SetPvP(TSPlayer player, bool mode)
         {
-            tSPlayer.SetPvP(mode);
-            tSPlayer.SendData(PacketTypes.TogglePvp, "", tSPlayer.Index, mode.ToInt());
+            player.SetPvP(mode);
+            player.SendData(PacketTypes.TogglePvp, "", player.Index, mode.ToInt());
         }
 
         public static string RepeatLineBreaks(int number)
@@ -227,5 +253,7 @@ namespace GracePeriod
 
             return sb.ToString();
         }
+
+       
     }
 }
