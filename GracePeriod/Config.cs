@@ -12,7 +12,7 @@
             Config vConf = new Config
             {
                 text_color = "FFFFFF",
-                timer_color = "a4c9a7",
+                timer_color = "8eec8e",
                 announcement_color = "FF0000",
                 announcement_text = "The grace period has ended.\nYou are now at the mercy of yourself and others.\nYou are being forced into PvP.",
             };

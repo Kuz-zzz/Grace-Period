@@ -22,7 +22,7 @@ namespace GracePeriod
 
         public override string Name => "Grace Period";
 
-        public override Version Version => new Version(1, 1, 0, 0);
+        public override Version Version => new Version(1, 2, 0, 0);
 
         public GracePeriod(Main game) : base(game)
         {
@@ -75,6 +75,9 @@ namespace GracePeriod
                 ServerApi.Hooks.GameUpdate.Deregister(this, OnGameUpdate);
 
                 GetDataHandlers.TogglePvp -= OnTogglePvp;
+
+                Timer.Dispose();
+                OneSecTimer.Dispose();
             }
             base.Dispose(disposing);
         }
@@ -133,6 +136,13 @@ namespace GracePeriod
 
         private void GraceStart(int sec)
         {
+            if (Timer.Enabled)
+            {
+                Timer.Enabled = false;
+                OneSecTimer.Enabled = false;
+                Timer.Elapsed -= new ElapsedEventHandler(GraceStop);
+                OneSecTimer.Elapsed -= new ElapsedEventHandler(OnOneSec);
+            }
             Timer.Interval = sec * 1000;
             Timer.Enabled = true;
             Timer.Elapsed += new ElapsedEventHandler(GraceStop);
@@ -147,8 +157,13 @@ namespace GracePeriod
 
         private void GraceStop()
         {
-            Timer.Enabled = false;
-            OneSecTimer.Enabled = false;
+            if (Timer.Enabled)
+            {
+                Timer.Enabled = false;
+                OneSecTimer.Enabled = false;
+                Timer.Elapsed -= new ElapsedEventHandler(GraceStop);
+                OneSecTimer.Elapsed -= new ElapsedEventHandler(OnOneSec);
+            }
             PvPForcedOn = true;
             ForcePvP();
             TShock.Utils.Broadcast(config.announcement_text, Microsoft.Xna.Framework.Color.Red);
