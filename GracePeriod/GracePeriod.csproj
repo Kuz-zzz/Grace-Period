@@ -7,18 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>dependencies\Newtonsoft.Json.dll</HintPath>
-    </Reference>
-    <Reference Include="OTAPI">
-      <HintPath>dependencies\OTAPI.dll</HintPath>
-    </Reference>
-    <Reference Include="TerrariaServer">
-      <HintPath>dependencies\TerrariaServer.dll</HintPath>
-    </Reference>
-    <Reference Include="TShockAPI">
-      <HintPath>dependencies\TShockAPI.dll</HintPath>
-    </Reference>
+    <PackageReference Include="TShock" Version="5.2.0" />
   </ItemGroup>
 
 </Project>
